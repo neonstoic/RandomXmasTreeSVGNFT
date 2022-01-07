@@ -1,0 +1,171 @@
+<html>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <style>
+        #warning {
+            color:red;
+            font-style:italic;
+            text-align:center;
+        }
+        #message {
+            color:blue;
+            text-align: center;
+        }
+        #metamask {
+            margin-right:5px;
+        }
+        nav {
+            position:fixed;
+            background-color:white;
+            width:100%;
+            padding-left:10px;
+            padding-right:10px;
+            border-bottom:1px solid #aaa;
+            height:30px;
+        }
+        #connection {
+            display:inline-block;
+            margin-right:15px;
+            padding:2px;
+            background-color:rgb(126, 255, 195);
+            text-align:right;
+            width:200px;
+            overflow: hidden;
+            text-overflow:clip;
+            text-align:center;
+        }
+    </style>
+    <body>
+        <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+        <script src="./abi.js"></script>
+        <script>
+            let web3;
+            let connectedAddress = '';
+
+            const chains = {
+                '137': {
+                    name: 'Polygon Mainnet',
+                },
+                '80001': {
+                    name: 'Polygon Mumbai Testnet',
+                },
+            };
+            let chainid=0;
+            let nftContract;
+            
+            function checkConnection(){
+                // Check if the user is connected or has a wallet that can connect
+                // If connected, setup web3.
+                
+                if(window.ethereum != null){
+                    // User has a wallet extension. Create web3 object.
+                    web3 = new Web3(window.ethereum);
+
+                    // Check that the user is on a polygon network
+                    web3.eth.getChainId().then(function(id){
+                        if(id in chains){                        
+                            // Then we are on polygon mainnet or polygon mumbai testnet.
+                            chainid = id;
+
+                            // Is the user connected? If not, enable the connect button.
+                            if(web3.eth.getAccounts().then(result => {
+                                if(result.length > 0){
+                                    connectedAddress = result[0];
+                                    console.log('Connected to ' + connectedAddress + ' on ' + chains[chainid]['name']);
+                                    document.getElementById('connection').innerText = "Connected:" + connectedAddress;
+                                    setReadyToMint();
+                                }else {
+                                    btnConnect = document.getElementById('btnConnect');
+                                    btnConnect.disabled=false;
+                                    btnConnect.innerText = 'Connect wallet to ' + chains[chainid]['name'];
+                                    btnConnect.onclick = connect;
+                                }
+                            }));
+                        }else {
+                            document.getElementById('warning').innerText = 'Please change to Polygon network.';
+                            document.getElementById('btnConnect').disabled = true;
+                            web3 = null;
+                        }
+                    });
+                }
+            }
+
+            let maxTrees=0;
+            let tokenCounter =0;
+            function setMessage(){
+                if(maxTrees > 0 && tokenCounter > 0){
+                    document.getElementById('message').innerText = '' + (parseInt(tokenCounter) + 1) + ' of ' + maxTrees + ' trees have been minted so far.';
+                }
+            }
+
+            function setReadyToMint(){
+                nftContract = new web3.eth.Contract(abi, '0x61f9e6C30fDc89a470027d8e55C4d31Af106FD71');
+                console.log(nftContract);
+
+                nftContract.methods.maxTrees().call(function(error, result){
+                    maxTrees = result;
+                    nftContract.methods.tokenCounter().call(function(error, result){
+                        tokenCounter = result;
+                        setMessage();
+                    });
+                });
+
+                var msgitem = document.getElementById('message');
+
+                document.getElementById('btnConnect').innerText = "Mint a Tree Now";
+                document.getElementById('btnConnect').disabled = false;
+                document.getElementById('btnConnect').onclick = function(){
+                    nftContract.methods.create().send({from: connectedAddress, gas: 2500000}, function(error, result){
+                        if(error != null){
+                            document.getElementById('warning').innerText = error;
+                        }else{
+                            document.getElementById('message').innerText = result;
+                            console.log('success!');
+                            console.log(result);
+                        }
+                    });
+                };
+            }
+
+            function connect(){
+                document.getElementById('warning').innerText = '';
+                if(window.ethereum != null){
+                    // Request account access if needed
+                    window.ethereum.enable().then(result => {
+                        checkConnection();
+                    }).catch(error => {
+                        console.log('Could not connect.' + error);
+                        document.getElementById('warning').innerText = "Could not connect: " + error.message;
+                    });
+                }
+            }
+            checkConnection();
+        </script>
+
+        <nav>
+            <h3>Winter Tree</h3>
+            <div id="connection">Not connected</div>
+        </nav>
+        <main>
+            <header>
+                <h1>Winter Tree</h1>
+                <p>by <a href="https://twitter.com/neonSt0ic">Neonstoic</a></p>
+                <a href="https://polygonscan.com/address/0xB370232110d4cBDFD070ee89f15c7F1C72C0B7c8"><img width="200" src="https://storage.opensea.io/files/4c7f5528729a1ac6e8fedebfc8ea0fa2.svg"/></a>
+            </header>
+            <hr/>
+            <section>
+                <p id="warning"></p>
+                <p id="message"></p>
+                <button id="btnConnect" disabled="true"><img id="metamask" src="metamask-icon.png"/>Connect</button>
+            </section>
+            <section>
+                <h2>About</h2>
+                <p>Way back in 2007(ish) I created this SVG Christmas tree as a simple experiment with SVG. It was relatively new at the time.</p>
+                <p>More recently, inspired by the <a href="https://www.lootproject.com/">Loot project</a>, I decided to create an onchain version of it.</p>
+                <p>You can mint your own tree from the contract (or from this page w Metamask). I recommend trying to interact with the <a href="https://polygonscan.com/address/0xB370232110d4cBDFD070ee89f15c7F1C72C0B7c8">contract</a> through a CLI as that's maybe more fun, but this simple page gets you there too. There are about 500 trees to mint.</p>
+                <p>Each tree has some (sorta) random aspects to it, created with the <a href="https://github.com/neonstoic/RandomXmasTreeSVGNFT/blob/main/XmasTree2.sol">Solidity contract</a>. There will be a randomly colored present placed at a random location and random snowflakes will fall.</p>
+                <p>Something to note about minting SVG on-chain is that even a simple image gets pretty big. These trees are around 1.5kb each and cost a little more than normal to execute the minting transaction. So I've only put this on Polygon so that it's still pretty cheap to mint.</p>
+                <p>I used the code from <a href="https://youtu.be/9oERTH9Bkw0">Patrick Collins amazing tutorial</a>, to start. I had a lot of difficulty getting the ChainLink VRF to work, so used the same approach for not-really-random-numbers as the Loot contract uses. It turns out that Solidity is still kinda hard to debug.</p>
+            </section>
+        </main>
+    </body>
+</html>
