@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "base64-sol/base64.sol";
 
-contract XmasTree2 is ERC721URIStorage, Ownable {
+contract WinterTrees is ERC721URIStorage, Ownable {
     uint256 public tokenCounter;
     uint256 public maxTrees;
 
@@ -25,10 +25,10 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
 
 
     constructor() 
-    ERC721("XmasTree2", "rsNFT")
+    ERC721("WinterTree", "rsNFT")
     {
         tokenCounter = 0;
-        maxTrees = 5;
+        maxTrees = 100;
         size = 500;
         colors = ["red", "blue", "#1a1", "#1ee", "#000", "#fff"];
         durvals = ["2.5","3","3.25","2.15","2","3.1","1.9"];
@@ -48,7 +48,7 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
         string memory svg = generateSVG(randomNumber);
         string memory imageURI = svgToImageURI(svg);
         _safeMint(msg.sender, tokenId);
-        _setTokenURI(tokenId, formatTokenURI(imageURI));    
+        _setTokenURI(tokenId, formatTokenURI(tokenId, imageURI));    
     }
 
     function random(string memory input) internal pure returns (uint256) {
@@ -57,7 +57,6 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
 
     function generateSVG(uint256 _randomness) public view returns (string memory finalSvg) {
         finalSvg = string(abi.encodePacked("<svg xmlns='http://www.w3.org/2000/svg' height='370' width='500' viewBox='50 0 100 70'><defs><g id='s' fill='#fff' stroke='#000'><circle r='1'/><circle r='1' cx='40' cy='20'/></g></defs>"));
-        finalSvg = string(abi.encodePacked(finalSvg, "<!-- ", uint2str(_randomness), " -->"));        
         string memory snowSVG1 = generateSnow(_randomness);        
         finalSvg = string(abi.encodePacked(finalSvg, snowSVG1));
         finalSvg = string(abi.encodePacked(finalSvg, "<g stroke='#000'><rect x='91' width='9' y='59' height='10' fill='#952'/><rect x='91' width='9' y='59' height='3' stroke-width='0' fill='#521'/>"));
@@ -87,7 +86,7 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
 
     function addPresent(uint256 _randomness) public view returns(string memory presentSvg) {
         string memory color = colors[_randomness % colors.length];
-        string memory ribboncolor = colors[(_randomness) % colors.length];
+        string memory ribboncolor = colors[(_randomness+1) % colors.length];
         uint256 xloc = ((_randomness) % 90) + 45;
         presentSvg = string(abi.encodePacked("<g stroke='#000' fill='",color,"' transform='translate(",uint2str(xloc)," 58)'><rect x='1' width='10' y='3' height='8' stroke-width='1'/><rect x='0' width='12' y='0' height='3' stroke-width='1'/><rect x='5' width='2' y='0' height='11' fill='",ribboncolor,"'/></g>"));
     }
@@ -121,7 +120,8 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
         return string(abi.encodePacked(baseURL,svgBase64Encoded));
     }
 
-    function formatTokenURI(string memory imageURI) public pure returns (string memory) {
+    function formatTokenURI(uint256 id, string memory imageURI) public pure returns (string memory) {
+        string memory desc = string(abi.encodePacked('Winter tree #', uint2str(id)));
         return string(
                 abi.encodePacked(
                     "data:application/json;base64,",
@@ -129,8 +129,8 @@ contract XmasTree2 is ERC721URIStorage, Ownable {
                         bytes(
                             abi.encodePacked(
                                 '{"name":"',
-                                "Xmas Tree", // You can add whatever name here
-                                '", "description":"An SVG Xmas tree with random snow and presents", "attributes":"", "image":"',imageURI,'"}'
+                                "Winter Tree", // You can add whatever name here
+                                '", "description":"',desc,'", "attributes":"", "image":"',imageURI,'"}'
                             )
                         )
                     )
