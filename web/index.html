@@ -1,5 +1,6 @@
 <html>
     <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <link rel="stylesheet" type="text/css" href="./loader.css">
     <style>
         #warning {
             color:red;
@@ -33,6 +34,18 @@
             text-overflow:clip;
             text-align:center;
         }
+
+        #treediv {
+            text-align:center;
+            display:block;
+            width:100%;
+            display:block;
+            text-align:center;
+        }
+        #btnConnect {
+            display:block;
+            clear:both;
+        }
     </style>
     <body>
         <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
@@ -43,15 +56,21 @@
 
             const chains = {
                 '137': {
-                    name: 'Polygon Mainnet',
+                    name: 'Polygon Mainnet',    
+                    contract: '0x61f9e6C30fDc89a470027d8e55C4d31Af106FD71',       
+                    polyscanurl: 'https://polygonscan.com/tx/',
                 },
                 '80001': {
                     name: 'Polygon Mumbai Testnet',
+                    contract: '0x82B47FD4bFDD208f8eF02E8169A16a35FD91B2B1',
+                    polyscanurl: 'https://mumbai.polygonscan.com/tx/',
                 },
             };
             let chainid=0;
+            let contractaddress=0;
             let nftContract;
-            
+            let polyscanurl;
+
             function checkConnection(){
                 // Check if the user is connected or has a wallet that can connect
                 // If connected, setup web3.
@@ -65,6 +84,10 @@
                         if(id in chains){                        
                             // Then we are on polygon mainnet or polygon mumbai testnet.
                             chainid = id;
+                            contractaddress = chains[id]['contract'];
+                            polyscanurl = chains[id]['polyscanurl'];
+
+                            console.log('using contract ' + contractaddress);
 
                             // Is the user connected? If not, enable the connect button.
                             if(web3.eth.getAccounts().then(result => {
@@ -93,12 +116,13 @@
             let tokenCounter =0;
             function setMessage(){
                 if(maxTrees > 0 && tokenCounter > 0){
-                    document.getElementById('message').innerText = '' + (parseInt(tokenCounter) + 1) + ' of ' + maxTrees + ' trees have been minted so far.';
+                    document.getElementById('message').innerText = '' + (parseInt(tokenCounter)) + ' of ' + maxTrees + ' trees have been minted so far.';
+                    
                 }
             }
 
             function setReadyToMint(){
-                nftContract = new web3.eth.Contract(abi, '0x61f9e6C30fDc89a470027d8e55C4d31Af106FD71');
+                nftContract = new web3.eth.Contract(abi, contractaddress);
                 console.log(nftContract);
 
                 nftContract.methods.maxTrees().call(function(error, result){
@@ -118,12 +142,59 @@
                         if(error != null){
                             document.getElementById('warning').innerText = error;
                         }else{
-                            document.getElementById('message').innerText = result;
-                            console.log('success!');
+                            //result is the transaction id
+                            document.getElementById('message').innerHTML = 'Transaction submitted! <a href="' + polyscanurl + result + '">View here</a>';
+                            console.log('submitted transaction successfully!');
                             console.log(result);
+                            waitForMint(result);                            
                         }
                     });
                 };
+            }
+
+            let curTxnId = 0;
+            function waitForMint(transactionid){
+                document.getElementById('loader').style.display = 'block';
+                var btn = document.getElementById('btnConnect');
+                btn.disabled = true;
+                btn.innerText = "Minting...";
+                curTxnId = transactionid;
+
+                web3.eth.getTransactionReceipt(transactionid).then(function(receipt){
+                    console.log('receipt=' + receipt);
+                    console.log(receipt);
+                    
+                    if(receipt == null){
+                        //Then transaction isn't complete. 
+                        //Wait 5 seconds and then call waitForMint again...
+                        setTimeout(()=> waitForMint(transactionid), 5000);
+                        return;
+                    }
+
+                    document.getElementById('loader').style.display = 'none';
+
+                    //get serial number of mint
+                    serial = receipt.logs[0].topics[3];
+
+                    //Image is stored in tokenURI
+                    nftContract.methods.tokenURI(parseInt(serial)).call(function(error, result){
+                            //result is the tokenURI data from the minted NFT
+                            //Within the contract is the data for the tree
+                            treeSVG = JSON.parse(atob(result.substring(29)))['image'];
+                            console.log('treesvg='+treeSVG);
+                            
+                            treediv = document.getElementById('mintedtree');
+                            treediv.innerHTML = '<p>Congrats! Minted tree ' + parseInt(serial) + '!</p>';
+                            treediv.innerHTML += '<a href="' + polyscanurl + curTxnId + '"><img width="250px" src="' + treeSVG + '"/></a>';
+                            treediv.style.visibility='visible';
+                            treediv.style.width = '100%';
+                            treediv.style.textAlign = 'center';
+
+                            var btn = document.getElementById('btnConnect');
+                            btn.disabled = false;
+                            btn.innerText = "Mint another!";                            
+                    });
+                });
             }
 
             function connect(){
@@ -156,12 +227,15 @@
                 <p id="warning"></p>
                 <p id="message"></p>
                 <button id="btnConnect" disabled="true"><img id="metamask" src="metamask-icon.png"/>Connect</button>
+                <div id="loader" style="width:100%; display:none"><div class="lds-ellipsis"><div></div><div></div><div></div><div></div></div></div>
+                <div id="mintedtree" style="visibility:hidden;">                    
+                </div>
             </section>
             <section>
                 <h2>About</h2>
                 <p>Way back in 2007(ish) I created this SVG Christmas tree as a simple experiment with SVG. It was relatively new at the time.</p>
                 <p>More recently, inspired by the <a href="https://www.lootproject.com/">Loot project</a>, I decided to create an onchain version of it.</p>
-                <p>You can mint your own tree from the contract (or from this page w Metamask). I recommend trying to interact with the <a href="https://polygonscan.com/address/0xB370232110d4cBDFD070ee89f15c7F1C72C0B7c8">contract</a> through a CLI as that's maybe more fun, but this simple page gets you there too. There are about 500 trees to mint.</p>
+                <p>You can mint your own tree from the contract (or from this page w Metamask). I recommend trying to interact with the <a href="https://polygonscan.com/address/0x61f9e6C30fDc89a470027d8e55C4d31Af106FD71">contract</a> through a CLI as that's maybe more fun, but this simple page gets you there too. There are about 500 trees to mint.</p>
                 <p>Each tree has some (sorta) random aspects to it, created with the <a href="https://github.com/neonstoic/RandomXmasTreeSVGNFT/blob/main/XmasTree2.sol">Solidity contract</a>. There will be a randomly colored present placed at a random location and random snowflakes will fall.</p>
                 <p>Something to note about minting SVG on-chain is that even a simple image gets pretty big. These trees are around 1.5kb each and cost a little more than normal to execute the minting transaction. So I've only put this on Polygon so that it's still pretty cheap to mint.</p>
                 <p>I used the code from <a href="https://youtu.be/9oERTH9Bkw0">Patrick Collins amazing tutorial</a>, to start. I had a lot of difficulty getting the ChainLink VRF to work, so used the same approach for not-really-random-numbers as the Loot contract uses. It turns out that Solidity is still kinda hard to debug.</p>
